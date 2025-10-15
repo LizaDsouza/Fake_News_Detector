@@ -19,9 +19,6 @@ def load_assets():
         vectorizer = joblib.load('vectorizer.pkl')
         return model, vectorizer
     except FileNotFoundError:
-        # We allow the app to run even if model files are missing, 
-        # as we are using a rule-based prediction for testing.
-        st.warning("ML Assets not found. Application running in **Analysis Demo Mode**.")
         return None, None
 
 # --- Text Preprocessing Function ---
@@ -58,9 +55,9 @@ def predict_news(text, model, vectorizer):
 # Load model and vectorizer once (Note: They might be None, but that's okay for the demo)
 model, vectorizer = load_assets()
 
-st.title(" Fake News Credibility Detector")
+st.title(" Fake News Detector")
 st.markdown("---")
-st.subheader("Automated Credibility Analysis")
+st.subheader("Automated Analysis")
 
 # Text input area for the user
 article_text = st.text_area(
