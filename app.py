@@ -72,9 +72,9 @@ def predict_news(text, model, vectorizer):
 # Load model and vectorizer once
 model, vectorizer = load_assets()
 
-st.title("📰 Fake News Credibility Detector")
+st.title("Fake News Credibility Detector")
 st.markdown("---")
-st.subheader("Linear SVC Model Deployment")
+st.subheader("Linear SVC Model")
 
 if model is None or vectorizer is None:
     st.warning("⚠️ Application cannot run. Please fix the model loading error shown above.")
@@ -99,13 +99,13 @@ else:
             
             # Display the result with appropriate styling
             if result == "FAKE":
-                st.error("🚨 WARNING: This article is likely **FAKE NEWS**.")
+                st.error("WARNING: This article is likely **FAKE NEWS**.")
                 st.markdown(
                     "<p style='font-size: 18px; color: #dc3545;'>The model has high confidence that this text contains characteristics commonly found in disinformation.</p>", 
                     unsafe_allow_html=True
                 )
             else:
-                st.success("✅ CREDIBLE: This article is likely **REAL NEWS**.")
+                st.success("CREDIBLE: This article is likely **REAL NEWS**.")
                 st.markdown(
                     "<p style='font-size: 18px; color: #198754;'>The model identifies characteristics consistent with verifiable reporting or credible sources.</p>", 
                     unsafe_allow_html=True
