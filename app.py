@@ -1,103 +1,113 @@
 import streamlit as st
 import joblib
-import random
-import time
+import re
+import string
+import numpy as np
 
-# --- 1. MODEL AND VECTORIZER LOADING ---
-# Use st.cache_resource to load the large model files only once,
-# which greatly improves performance when the app reruns.
+# --- Configuration ---
+# Set page configuration for better mobile viewing and title
+st.set_page_config(page_title="Fake News Detector (SVC)", layout="centered")
 
+# --- Model Loading and Caching ---
 @st.cache_resource
 def load_assets():
-    """Loads the trained model and TfidfVectorizer from disk.
-    ACTION REQUIRED: To use your real model, replace the MOCK section 
-    below with your joblib.load() calls and ensure your .pkl files are present.
-    """
+    """Loads the trained Linear SVC model and TfidfVectorizer."""
     try:
         
         model = joblib.load('model.pkl')
         vectorizer = joblib.load('vectorizer.pkl')
-
-        # --- MOCK OBJECTS FOR DEMO (This section is ACTIVE now) ---
-        class MockModel:
-            def predict(self, X):
-                text = X[0].lower()
-                # If the text contains formal, specific terms, predict REAL
-                if "economic research" in text or "nber" in text or "analysts project" in text:
-                    return ['REAL']
-                # If the text contains sensational/vague terms, predict FAKE
-                if "wake up" in text or "shadow government" in text or "share this article" in text:
-                    return ['FAKE']
-                
-                # Default behavior for non-specific text (can be random or FAKE for safety)
-                return ['REAL'] if random.random() < 0.5 else ['FAKE']
-        
-        class MockVectorizer:
-            def transform(self, X):
-                # Passes the raw text list through, as the mock model handles strings
-                return X 
-        
-        model = MockModel()
-        vectorizer = MockVectorizer()
         return model, vectorizer
-    
-    except Exception as e:
-        # If the real joblib.load fails (because the files are missing)
-        st.error(f"Asset loading failed: Could not load real .pkl files. Please check if they exist.")
+    except FileNotFoundError:
+        st.error(
+            "Model assets failed to load. Please ensure 'fake_news_model.pkl' "
+            "and 'vectorizer.pkl' are in the same directory as this app.py file."
+        )
         return None, None
-        
+
+# --- Text Preprocessing Function (ENHANCED for stability) ---
+def clean_text(text):
+    """
+    Cleans and preprocesses text input to match the format used during model training.
+    
+    Enhanced to handle browser-added newlines and whitespace more robustly.
+    """
+    text = str(text).lower()
+    
+    # CRITICAL ADDITION: Replace newlines and strip all trailing/leading whitespace
+    text = text.replace('\n', ' ').strip() 
+    
+    # Remove HTML tags
+    text = re.sub('<.*?>+', '', text)
+    # Remove URLs
+    text = re.sub('https?://\S+|www\.\S+', '', text)
+    # Remove punctuation
+    text = re.sub('[%s]' % re.escape(string.punctuation), ' ', text)
+    # Remove numbers
+    text = re.sub('\w*\d\w*', '', text)
+    # Remove multiple spaces and strip again
+    text = re.sub(' +', ' ', text).strip()
+    return text
+
+# --- Prediction Logic ---
+def predict_news(text, model, vectorizer):
+    """Takes clean text, vectorizes it, and returns the model prediction."""
+    
+    # 1. Clean the input text
+    clean_input = clean_text(text)
+    
+    # 2. Vectorize the text using the loaded TfidfVectorizer
+    vectorized_input = vectorizer.transform([clean_input])
+    
+    # 3. Make the prediction
+    prediction = model.predict(vectorized_input)
+
+    # Assumes 0 = FAKE, 1 = REAL based on common ML convention
+    if prediction[0] == 0:
+        return "FAKE"
+    else:
+        return "REAL"
+
+# --- Main Streamlit App Layout ---
+
+# Load model and vectorizer once
 model, vectorizer = load_assets()
 
-# --- 2. STREAMLIT UI ---
+st.title("📰 Fake News Credibility Detector")
+st.markdown("---")
+st.subheader("Linear SVC Model Deployment")
 
-st.set_page_config(
-    page_title="Fake News Detector",
-    layout="centered",
-    initial_sidebar_state="auto"
-)
+if model is None or vectorizer is None:
+    st.warning("⚠️ Application cannot run. Please fix the model loading error shown above.")
+else:
+    # Text input area for the user
+    article_text = st.text_area(
+        "Paste the Article Text Below:", 
+        height=300,
+        placeholder="Enter the full text of the news article you wish to verify..."
+    )
 
-st.title("Fake News Detector")
-st.markdown("Paste your news article below for instant credibility analysis using a machine learning model.")
-
-# --- Text Input Area ---
-article_text = st.text_area(
-    "Article Text (Min. 50 words recommended)", 
-    height=300,
-    placeholder="Paste the full text of the news article here..."
-)
-
-# --- Prediction Button ---
-if st.button("Detect Credibility", use_container_width=True, type="primary"):
-    
-    if not model or not vectorizer:
-        st.warning("Cannot run prediction: Model assets failed to load.")
-        st.stop()
-        
-    article = article_text.strip()
-    min_words = 50
-    word_count = len(article.split())
-
-    if word_count < min_words:
-        st.warning(f"Please enter at least {min_words} words ({word_count} entered) for a reliable prediction.")
-    elif not article:
-        st.warning("Please enter some text to analyze.")
-    else:
-        # --- Prediction Logic ---
-        with st.spinner('Analyzing article text and running model prediction...'):
-            # 1. Transform the input text
-            transformed_text = vectorizer.transform([article])
-            
-            # 2. Get the prediction
-            prediction_result = model.predict(transformed_text)[0].upper()
-            
-        # --- Display Result ---
-        st.subheader("Prediction Result:")
-        
-        if prediction_result == 'REAL':
-            st.success(f"REAL: This article is likely truthful and credible.")
-            st.write("Keep in mind that this is a machine learning prediction and not a guarantee.")
-        elif prediction_result == 'FAKE':
-            st.error(f"FAKE: Caution advised. This article shows characteristics of disinformation.")
-            st.write("Double-check sources and look for corroborating evidence from trusted news organizations.")
+    if st.button("Detect Credibility", type="primary"):
+        if not article_text or len(article_text.strip()) < 50:
+            st.warning("Please enter a substantial amount of text (at least 50 characters) to analyze.")
         else:
-            st.info("The model returned an ambiguous result. Please try another article.")
+            with st.spinner("Analyzing text and running prediction..."):
+                # Run the prediction
+                result = predict_news(article_text, model, vectorizer)
+
+            st.markdown("## Prediction Result")
+            st.markdown("---")
+            
+            # Display the result with appropriate styling
+            if result == "FAKE":
+                st.error("🚨 WARNING: This article is likely **FAKE NEWS**.")
+                st.markdown(
+                    "<p style='font-size: 18px; color: #dc3545;'>The model has high confidence that this text contains characteristics commonly found in disinformation.</p>", 
+                    unsafe_allow_html=True
+                )
+            else:
+                st.success("✅ CREDIBLE: This article is likely **REAL NEWS**.")
+                st.markdown(
+                    "<p style='font-size: 18px; color: #198754;'>The model identifies characteristics consistent with verifiable reporting or credible sources.</p>", 
+                    unsafe_allow_html=True
+                )
+            st.markdown("---")
