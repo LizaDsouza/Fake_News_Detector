@@ -72,7 +72,7 @@ def predict_news(text, model, vectorizer):
 # Load model and vectorizer once
 model, vectorizer = load_assets()
 
-st.title("Fake News Credibility Detector")
+st.title("Fake News Detector")
 st.markdown("---")
 st.subheader("Linear SVC Model")
 
@@ -111,3 +111,18 @@ else:
                     unsafe_allow_html=True
                 )
             st.markdown("---")
+
+            # --- Prediction Logic (Updated to account for flipped classes) ---
+def predict_news(text, model, vectorizer):
+    """Takes clean text, vectorizes it, and returns the model prediction."""
+    
+    clean_input = clean_text(text)
+    vectorized_input = vectorizer.transform([clean_input])
+    prediction = model.predict(vectorized_input)
+
+    # CRITICAL CHANGE: The prediction logic is flipped here. 
+    # If the model predicts 0, we now assume that means REAL.
+    if prediction[0] == 0:
+        return "REAL"
+    else:
+        return "FAKE" # If the model predicts 1, we now assume that means FAKE.
